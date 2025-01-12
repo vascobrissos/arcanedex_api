@@ -3,25 +3,45 @@ const jwt = require('jsonwebtoken'); // Import the JWT library for token generat
 const bcrypt = require('bcrypt'); // Import bcrypt for hashing passwords
 require('dotenv').config(); // Load environment variables from a .env file into process.env
 
-// Register a new user
 exports.registerUser = async (req, res) => {
     try {
-        const { FirstName, LastName, Email, Genero, Username, Password, Role } = req.body; // Extract user details from the request body
-        const hashedPassword = await bcrypt.hash(Password, 10); // Hash the password with a salt factor of 10
+        const { FirstName, LastName, Email, Genero, Username, Password, Role } = req.body;
+
+        // Input validation
+        if (!FirstName || !LastName || !Email || !Username || !Password || !Role) {
+            return res.status(400).json({ error: 'All fields are required' });
+        }
+
+        const emailExists = await User.findOne({ where: { Email } });
+        if (emailExists) {
+            return res.status(400).json({ error: 'Email already in use' });
+        }
+
+        const usernameExists = await User.findOne({ where: { Username } });
+        if (usernameExists) {
+            return res.status(400).json({ error: 'Username already in use' });
+        }
+
+        // Hash the password
+        const hashedPassword = await bcrypt.hash(Password, 10);
+
+        // Insert the new user
         const newUser = await User.create({
             FirstName,
             LastName,
             Email,
             Genero,
             Username,
-            Password: hashedPassword, // Store the hashed password
+            Password: hashedPassword,
             Role,
         });
-        res.status(201).json(newUser); // Respond with the newly created user
+
+        res.status(201).json(newUser);
     } catch (error) {
-        res.status(500).json({ error: error.message }); // Handle server errors
+        res.status(500).json({ error: error.message });
     }
 };
+
 
 // Log in an existing user
 exports.loginUser = async (req, res) => {
