@@ -27,14 +27,52 @@ exports.getAllCreatures = async (req, res) => {
 
 // Controller function to add a new creature
 exports.addCreature = async (req, res) => {
+    const { Name, Lore, Img, CreatedBy } = req.body; // Extract data from the request body
+
     try {
-        const { Name, Lore, Img, CreatedBy } = req.body; // Extract data from the request body
-        const newCreature = await Creature.create({ Name, Lore, Img, CreatedBy }); // Create a new record
-        res.status(201).json(newCreature); // Respond with the newly created creature
+        // Check if a creature with the same name already exists
+        const existingCreature = await Creature.findOne({ where: { Name } });
+        if (existingCreature) {
+            return res.status(400).json({ error: 'A creature with this name already exists.' });
+        }
+
+        // Decode the Base64 image if provided
+        let buffer = null;
+        if (Img) {
+            const base64Data = Img.split(',')[1]; // Remove the "data:image/jpeg;base64," prefix
+            buffer = Buffer.from(base64Data, 'base64'); // Convert to binary buffer
+        }
+
+        // Start a transaction to ensure atomicity
+        const result = await Creature.sequelize.transaction(async (transaction) => {
+            // Save the creature to the database within the transaction
+            const newCreature = await Creature.create(
+                {
+                    Name,
+                    Lore,
+                    Img: buffer, // Save the binary data in the MEDIUMBLOB column
+                    CreatedBy,
+                },
+                { transaction }
+            );
+            return newCreature;
+        });
+
+        // Respond with the newly created creature
+        res.status(201).json(result);
     } catch (error) {
-        res.status(500).json({ error: error.message }); // Handle server errors
+        console.error('Error adding creature:', error);
+
+        // Handle known errors
+        if (error.name === 'SequelizeUniqueConstraintError') {
+            res.status(400).json({ error: 'Creature name must be unique.' });
+        } else {
+            res.status(500).json({ error: 'Failed to add creature.' });
+        }
     }
 };
+
+
 
 // Controller function to update a creature's details
 exports.editCreature = async (req, res) => {

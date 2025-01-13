@@ -2,28 +2,63 @@ const Creature = require('../models/creature'); // Import the Creature model
 const UserFavourite = require('../models/userFavourite'); // Import the UserFavourite model
 const { Op } = require('sequelize'); // Import Sequelize operators for querying
 
-// Fetch all creatures with optional filters for name, latest creation date, and pagination
+// Helper function to determine the MIME type of binary image data
+const getMimeType = (imgBuffer) => {
+    const signature = imgBuffer.slice(0, 4).toString('hex'); // Get the first few bytes as a hex signature
+    switch (signature) {
+        case '89504e47': return 'image/png'; // PNG
+        case 'ffd8ffe0': case 'ffd8ffe1': case 'ffd8ffe2': return 'image/jpeg'; // JPEG
+        case '47494638': return 'image/gif'; // GIF
+        default: return 'application/octet-stream'; // Unknown or unsupported type
+    }
+};
+
+// Endpoint to fetch all creatures
 exports.getAllCreatures = async (req, res) => {
-    const { name, latest, page = 1, limit = 10 } = req.query; // Extract query parameters with defaults
+    const { name, latest, page = 1, limit = 10 } = req.query;
 
     try {
-        const where = {}; // Initialize filter conditions
-        if (name) where.Name = { [Op.like]: `%${name}%` }; // Filter by name (case-insensitive, partial match)
-        if (latest) where.CreatedOn = { [Op.lt]: latest }; // Filter by creation date (less than 'latest')
+        // Build filter conditions
+        const where = {};
+        if (name) {
+            where.Name = { [Op.like]: `%${name}%` }; // Case-insensitive partial match
+        }
+        if (latest) {
+            where.CreatedOn = { [Op.lt]: latest }; // Filter by creation date
+        }
 
-        const creatures = await Creature.findAndCountAll({
-            where, // Apply filter conditions
-            attributes: ['Id', 'Name', 'Img'], // Select specific fields to return
-            limit: parseInt(limit, 10), // Convert limit to integer
+        // Query the database with filters and pagination
+        const { rows, count } = await Creature.findAndCountAll({
+            where,
+            attributes: ['Id', 'Name', 'Img', 'Lore'], // Select specific fields
+            limit: parseInt(limit, 10), // Parse limit as an integer
             offset: (parseInt(page, 10) - 1) * parseInt(limit, 10), // Calculate offset for pagination
         });
 
-        res.status(200).json({ data: creatures.rows, count: creatures.count }); // Send data and total count
+        // Transform the `Img` field to Base64 with the appropriate MIME type
+        const transformedCreatures = rows.map(creature => {
+            const mimeType = creature.Img ? getMimeType(creature.Img) : null;
+            return {
+                Id: creature.Id,
+                Name: creature.Name,
+                Img: creature.Img
+                    ? `data:${mimeType};base64,${creature.Img.toString('base64')}` // Convert Buffer to Base64 with correct MIME
+                    : null, // Handle null images
+                Lore: creature.Lore
+            };
+        });
+
+        // Send response with data and total count
+        return res.status(200).json({
+            data: transformedCreatures,
+            count, // Total number of records
+        });
     } catch (error) {
         console.error('Error fetching creatures:', error); // Log error for debugging
-        res.status(500).json({ error: error.message }); // Send server error response
+        return res.status(500).json({ error: 'Failed to fetch creatures. Please try again.' }); // User-friendly error message
     }
 };
+
 
 // Fetch detailed information for a single creature by ID
 exports.getCreatureDetails = async (req, res) => {
