@@ -5,11 +5,6 @@ const authMiddleware = require('../middleware/authMiddleware'); // Import authen
 
 // Public Routes
 
-// Get details of a specific creature by ID
-router.get('/:id', creatureController.getCreatureDetails);
-// Calls the `getCreatureDetails` method in the controller to fetch details of a creature by its ID
-// This route is also publicly accessible
-
 
 // Protected Routes (Require Authentication)
 
@@ -18,6 +13,11 @@ router.get('/',
     authMiddleware.verifyToken, // Middleware to verify the user's token
     creatureController.getAllCreatures
 );
+
+// Get details of a specific creature by ID
+router.get('/:id', 
+    authMiddleware.verifyToken, // Middleware to verify the user's token
+    creatureController.getCreatureDetails);
 
 // Add a creature to the user's favourites
 router.post(

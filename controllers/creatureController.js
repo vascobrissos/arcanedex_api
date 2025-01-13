@@ -76,16 +76,31 @@ exports.getAllCreatures = async (req, res) => {
     }
 };
 
-// Fetch detailed information for a single creature by ID
+// Fetch BackgroundImg for a creature favorited by the user
 exports.getCreatureDetails = async (req, res) => {
     try {
-        const creature = await Creature.findByPk(req.params.id, {
-            attributes: ['Id', 'Name', 'Img', 'Lore'], // Select specific fields to return
+        // Check if the creature is favorited by the user
+        const favorite = await UserFavourite.findOne({
+            where: {
+                CreatureId: req.params.id,
+                UserId: req.userId, // Assuming the user ID is extracted via middleware
+            },
+            attributes: ['BackgroundImg'], // Only fetch the BackgroundImg
         });
-        if (!creature) return res.status(404).json({ error: 'Creature not found' }); // If not found, return 404
-        res.status(200).json(creature); // Return the creature details
+
+        if (!favorite) {
+            return res.status(404).json({ error: 'Favourite not found for this user and creature.'});
+        }
+
+        // Return only the BackgroundImg as Base64
+        res.status(200).json({
+            BackgroundImg: favorite.BackgroundImg
+                ? `data:image/png;base64,${favorite.BackgroundImg.toString('base64')}`
+                : null, // Convert BackgroundImg to Base64 if it exists
+        });
     } catch (error) {
-        res.status(500).json({ error: error.message }); // Send server error response
+        console.error('Error fetching favorite background image:', error);
+        res.status(500).json({ error: 'Failed to fetch background image. Please try again.' });
     }
 };
 
