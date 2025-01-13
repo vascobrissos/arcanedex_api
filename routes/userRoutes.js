@@ -6,24 +6,29 @@ const authMiddleware = require('../middleware/authMiddleware'); // Import authen
 // Public Routes
 
 // Register a new user
-router.post('/register', userController.registerUser); 
-// Calls the `registerUser` method in the user controller
-// This route is publicly accessible and allows new users to create accounts
+router.post('/register', userController.registerUser);
+// Allows new users to create an account by providing required details (e.g., username, password, email).
 
 // Login an existing user
-router.post('/login', userController.loginUser); 
-// Calls the `loginUser` method in the user controller
-// This route is publicly accessible and allows users to log in and receive a JWT token
+router.post('/login', userController.loginUser);
+// Allows existing users to log in with their credentials and receive a JWT token.
 
-// Protected Route
+// Protected Routes
 
 // Get the profile of the currently logged-in user
 router.get(
-    '/profile', 
-    authMiddleware.verifyToken, // Middleware to verify the user's JWT token
-    userController.getUserProfile // Calls the `getUserProfile` method in the user controller
+    '/profile',
+    authMiddleware.verifyToken, // Middleware to verify the JWT token
+    userController.getUserProfile // Retrieves the user's profile (excluding sensitive info like password).
 );
-// This route is protected and requires the user to be authenticated
-// The token is verified before allowing access to the user's profile
 
-module.exports = router; // Export the router to use in other parts of the application
+// Update the currently logged-in user's profile (except username)
+router.put(
+    '/profile',
+    authMiddleware.verifyToken, // Middleware to verify the JWT token
+    userController.updateUser // Calls the `updateUser` method in the user controller
+);
+// Allows authenticated users to update their details (e.g., email, name, password) while keeping the username unchanged.
+
+// Export the router to be used in other parts of the application
+module.exports = router;

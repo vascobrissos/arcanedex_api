@@ -13,52 +13,68 @@ const getMimeType = (imgBuffer) => {
     }
 };
 
-// Endpoint to fetch all creatures
+// Endpoint para buscar todas as criaturas
 exports.getAllCreatures = async (req, res) => {
     const { name, latest, page = 1, limit = 10 } = req.query;
+    const userId = req.userId; // Assumindo que o userId vem do middleware de autenticação
 
     try {
-        // Build filter conditions
+        // Construir condições de filtro
         const where = {};
         if (name) {
-            where.Name = { [Op.like]: `%${name}%` }; // Case-insensitive partial match
+            where.Name = { [Op.like]: `%${name}%` }; // Filtro parcial por nome
         }
         if (latest) {
-            where.CreatedOn = { [Op.lt]: latest }; // Filter by creation date
+            where.CreatedOn = { [Op.lt]: latest }; // Filtro por data de criação
         }
 
-        // Query the database with filters and pagination
+        // Consultar a tabela Creatures com filtros e paginação
         const { rows, count } = await Creature.findAndCountAll({
             where,
-            attributes: ['Id', 'Name', 'Img', 'Lore'], // Select specific fields
-            limit: parseInt(limit, 10), // Parse limit as an integer
-            offset: (parseInt(page, 10) - 1) * parseInt(limit, 10), // Calculate offset for pagination
+            attributes: ['Id', 'Name', 'Img', 'Lore'], // Selecionar campos específicos
+            limit: parseInt(limit, 10), // Limite de registros por página
+            offset: (parseInt(page, 10) - 1) * parseInt(limit, 10), // Calcular offset para paginação
         });
 
-        // Transform the `Img` field to Base64 with the appropriate MIME type
+        // Obter IDs das criaturas
+        const creatureIds = rows.map(creature => creature.Id);
+
+        // Verificar favoritos do usuário
+        const favorites = await UserFavourite.findAll({
+            where: {
+                UserId: userId,
+                CreatureId: { [Op.in]: creatureIds },
+            },
+            attributes: ['CreatureId'],
+        });
+
+        // Criar um conjunto com os IDs das criaturas favoritas
+        const favoriteSet = new Set(favorites.map(fav => fav.CreatureId));
+
+        // Transformar os resultados para incluir o campo "isFavoriteToUser"
         const transformedCreatures = rows.map(creature => {
             const mimeType = creature.Img ? getMimeType(creature.Img) : null;
             return {
                 Id: creature.Id,
                 Name: creature.Name,
                 Img: creature.Img
-                    ? `data:${mimeType};base64,${creature.Img.toString('base64')}` // Convert Buffer to Base64 with correct MIME
-                    : null, // Handle null images
-                Lore: creature.Lore
+                    ? `data:${mimeType};base64,${creature.Img.toString('base64')}` // Converter Buffer para Base64 com MIME
+                    : null,
+                Lore: creature.Lore,
+                isFavoriteToUser: favoriteSet.has(creature.Id), // Verificar se é favorito
             };
         });
 
-        // Send response with data and total count
+        // Enviar resposta com dados e contagem total
         return res.status(200).json({
             data: transformedCreatures,
-            count, // Total number of records
+            count, // Número total de registros
         });
     } catch (error) {
-        console.error('Error fetching creatures:', error); // Log error for debugging
-        return res.status(500).json({ error: 'Failed to fetch creatures. Please try again.' }); // User-friendly error message
+        console.error('Erro ao buscar criaturas:', error); // Log de erro para debug
+        return res.status(500).json({ error: 'Falha ao buscar criaturas. Por favor, tente novamente.' }); // Mensagem de erro amigável
     }
 };
-
 
 // Fetch detailed information for a single creature by ID
 exports.getCreatureDetails = async (req, res) => {

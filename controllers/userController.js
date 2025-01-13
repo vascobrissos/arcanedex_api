@@ -76,3 +76,42 @@ exports.getUserProfile = async (req, res) => {
         res.status(500).json({ error: error.message }); // Handle server errors
     }
 };
+
+// Update user profile (except username)
+exports.updateUser = async (req, res) => {
+    try {
+        const userId = req.userId; // Extract user ID from the JWT middleware
+        const { FirstName, LastName, Email, Genero, Password } = req.body;
+
+        // Validate required fields
+        if (!FirstName && !LastName && !Email && !Genero && !Password) {
+            return res.status(400).json({ error: 'At least one field must be updated' });
+        }
+
+        const user = await User.findByPk(userId); // Find the user by primary key
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        // If email is being updated, check for uniqueness
+        if (Email && Email !== user.Email) {
+            const emailExists = await User.findOne({ where: { Email } });
+            if (emailExists) {
+                return res.status(400).json({ error: 'Email already in use' });
+            }
+        }
+
+        // Update user fields
+        if (FirstName) user.FirstName = FirstName;
+        if (LastName) user.LastName = LastName;
+        if (Email) user.Email = Email;
+        if (Genero) user.Genero = Genero;
+        if (Password) user.Password = await bcrypt.hash(Password, 10); // Hash the new password
+
+        await user.save(); // Save the changes to the database
+
+        res.status(200).json({ message: 'User updated successfully', user });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
