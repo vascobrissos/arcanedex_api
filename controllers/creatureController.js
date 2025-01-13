@@ -108,7 +108,7 @@ exports.addCreatureToFavourites = async (req, res) => {
 exports.removeCreatureFromFavourites = async (req, res) => {
     try {
         const deleted = await UserFavourite.destroy({
-            where: { Id: req.params.id, UserId: req.userId }, // Match by ID and user ownership
+            where: { CreatureId: req.params.id, UserId: req.userId }, // Match by ID and user ownership
         });
         if (!deleted) return res.status(404).json({ error: 'Favourite not found' }); // If not found, return 404
         res.status(200).json({ message: 'Favourite removed successfully' }); // Confirm successful removal
