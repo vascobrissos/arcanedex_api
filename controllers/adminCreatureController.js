@@ -27,7 +27,11 @@ exports.getAllCreatures = async (req, res) => {
 
 // Controller function to add a new creature
 exports.addCreature = async (req, res) => {
-    const { Name, Lore, Img, CreatedBy } = req.body; // Extract data from the request body
+    const { Name, Lore, Img } = req.body; // Extract data from the request body
+
+    const CreatedBy = req.userId;
+
+	console.log(Img)
 
     try {
         // Check if a creature with the same name already exists
@@ -76,17 +80,34 @@ exports.addCreature = async (req, res) => {
 
 // Controller function to update a creature's details
 exports.editCreature = async (req, res) => {
+    const { Name, Lore, Img } = req.body; // Extract updated data from the request body
+
     try {
-        const { Name, Lore, Img } = req.body; // Extract updated data from the request body
+        // Decode the Base64 image if provided
+        let buffer = null;
+        if (Img) {
+            const base64Data = Img.split(',')[1]; // Remove the "data:image/jpeg;base64," prefix
+            buffer = Buffer.from(base64Data, 'base64'); // Convert to binary buffer
+        }
+
+        // Update the creature's details in the database
         const updated = await Creature.update(
-            { Name, Lore, Img }, // Fields to update
+            { 
+                Name, 
+                Lore, 
+                Img: buffer // Save the binary data in the MEDIUMBLOB column
+            },
             { where: { Id: req.params.id } } // Match the creature by ID from the request params
         );
 
-        if (!updated[0]) return res.status(404).json({ error: 'Creature not found' }); // If no rows are updated, return a 404 error
+        if (!updated[0]) {
+            return res.status(404).json({ error: 'Creature not found' }); // If no rows are updated, return a 404 error
+        }
+
         res.status(200).json({ message: 'Creature updated successfully' }); // Respond with success message
     } catch (error) {
-        res.status(500).json({ error: error.message }); // Handle server errors
+        console.error('Error updating creature:', error);
+        res.status(500).json({ error: 'Failed to update creature.' }); // Handle server errors
     }
 };
 

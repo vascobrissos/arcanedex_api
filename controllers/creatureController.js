@@ -4,12 +4,19 @@ const { Op } = require('sequelize'); // Import Sequelize operators for querying
 
 // Helper function to determine the MIME type of binary image data
 const getMimeType = (imgBuffer) => {
-    const signature = imgBuffer.slice(0, 4).toString('hex'); // Get the first few bytes as a hex signature
+    if (!imgBuffer || imgBuffer.length < 4) return null; // Verifica se o buffer é válido
+    const signature = imgBuffer.slice(0, 4).toString('hex');
     switch (signature) {
         case '89504e47': return 'image/png'; // PNG
-        case 'ffd8ffe0': case 'ffd8ffe1': case 'ffd8ffe2': return 'image/jpeg'; // JPEG
+        case 'ffd8ffe0': 
+        case 'ffd8ffe1': 
+        case 'ffd8ffe2': 
+        case 'ffd8ffe3': 
+        case 'ffd8ffe8': return 'image/jpeg'; // JPEG
         case '47494638': return 'image/gif'; // GIF
-        default: return 'application/octet-stream'; // Unknown or unsupported type
+        case '49492a00': 
+        case '4d4d002a': return 'image/tiff'; // TIFF
+        default: return 'application/octet-stream'; // Tipo desconhecido
     }
 };
 
@@ -107,30 +114,43 @@ exports.getAllCreatures = async (req, res) => {
 // Fetch BackgroundImg for a creature favorited by the user
 exports.getCreatureDetails = async (req, res) => {
     try {
-        // Check if the creature is favorited by the user
+        console.log("Fetching creature details...");
+
         const favorite = await UserFavourite.findOne({
             where: {
                 CreatureId: req.params.id,
-                UserId: req.userId, // Assuming the user ID is extracted via middleware
+                UserId: req.userId,
             },
-            attributes: ['BackgroundImg'], // Only fetch the BackgroundImg
+            attributes: ['BackgroundImg'], // Fetch only the BackgroundImg field
         });
 
         if (!favorite) {
-            return res.status(404).json({ error: 'Favourite not found for this user and creature.'});
+            return res.status(404).json({ error: 'Favourite not found for this user and creature.' });
         }
 
-        // Return only the BackgroundImg as Base64
+        let backgroundImgBase64 = null;
+
+        if (favorite.BackgroundImg) {
+            const mimeType = getMimeType(favorite.BackgroundImg);
+
+            if (!mimeType || mimeType === 'application/octet-stream') {
+                console.log("Buffer Signature:", favorite.BackgroundImg.slice(0, 4).toString('hex'));
+                return res.status(400).json({ error: 'Unsupported image format.' });
+            }
+
+            backgroundImgBase64 = `data:${mimeType};base64,${favorite.BackgroundImg.toString('base64')}`;
+            console.log("Detected MIME Type:", mimeType);
+        }
+
         res.status(200).json({
-            BackgroundImg: favorite.BackgroundImg
-                ? `data:image/png;base64,${favorite.BackgroundImg.toString('base64')}`
-                : null, // Convert BackgroundImg to Base64 if it exists
+            BackgroundImg: backgroundImgBase64, // Return Base64-encoded image with MIME type
         });
     } catch (error) {
         console.error('Error fetching favorite background image:', error);
         res.status(500).json({ error: 'Failed to fetch background image. Please try again.' });
     }
 };
+
 
 // Add a creature to the user's favourites
 exports.addCreatureToFavourites = async (req, res) => {
@@ -169,8 +189,15 @@ exports.changeFavouriteCreatureBackground = async (req, res) => {
             return res.status(400).json({ error: 'BackgroundImg is required' });
         }
 
+        // Decode the Base64 image if provided
+        let buffer = null;
+        if (BackgroundImg) {
+            const base64Data = BackgroundImg.split(',')[1]; // Remove the "data:image/jpeg;base64," prefix
+            buffer = Buffer.from(base64Data, 'base64'); // Convert to binary buffer
+        }
+
         const updated = await UserFavourite.update(
-            { BackgroundImg },
+            { BackgroundImg: buffer }, // Save the binary data
             { where: { CreatureId: req.params.id, UserId: req.userId } }
         );
 
@@ -180,7 +207,7 @@ exports.changeFavouriteCreatureBackground = async (req, res) => {
 
         res.status(200).json({ message: 'Background updated successfully' });
     } catch (error) {
-        console.error(error);
+        console.error('Error updating background image:', error);
         res.status(500).json({ error: 'Failed to update background image.' });
     }
 };
