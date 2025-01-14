@@ -22,6 +22,9 @@ router.get(
     userController.getUserProfile // Retrieves the user's profile (excluding sensitive info like password).
 );
 
+// Rota para deletar a conta do usuário
+router.delete('/deleteAccount', authMiddleware.verifyToken, userController.deleteUserAccount);
+
 // Update the currently logged-in user's profile (except username)
 router.put(
     '/profile',
