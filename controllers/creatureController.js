@@ -15,43 +15,75 @@ const getMimeType = (imgBuffer) => {
 
 // Endpoint para buscar todas as criaturas
 exports.getAllCreatures = async (req, res) => {
-    const { name, latest, page = 1, limit = 10 } = req.query;
-    const userId = req.userId; // Assumindo que o userId vem do middleware de autenticação
+    const { name, latest, page = 1, limit = 10, OnlyFavoriteArcanes = false, ToSaveOffline = false } = req.query;
+    const userId = req.userId; // Assumindo que o userId vem do middleware de autentica  o
 
     try {
-        // Construir condições de filtro
+        // Construir condi  es de filtro
         const where = {};
-        if (name) {
+        if (name && name.trim() !== "") {
             where.Name = { [Op.like]: `%${name}%` }; // Filtro parcial por nome
         }
         if (latest) {
-            where.CreatedOn = { [Op.lt]: latest }; // Filtro por data de criação
+            where.CreatedOn = { [Op.lt]: latest }; // Filtro por data de cria  o
         }
 
-        // Consultar a tabela Creatures com filtros e paginação
+        // Verificar condi  es especiais para favoritos ou salvar offline
+        if (ToSaveOffline === 'true') {
+            // Se ToSaveOffline for true, ignorar favoritos e devolver 10 registros
+            const monsters = await Creature.findAll({
+                attributes: ['Id', 'Name', 'Img', 'Lore'],
+                limit: 10,
+            });
+
+            const transformedCreatures = monsters.map(creature => {
+                const mimeType = creature.Img ? getMimeType(creature.Img) : null;
+                return {
+                    Id: creature.Id,
+                    Name: creature.Name,
+                    Img: creature.Img
+                        ? `data:${mimeType};base64,${creature.Img.toString('base64')}` // Converter Buffer para Base64 com MIME
+                        : null,
+                    Lore: creature.Lore,
+                    isFavoriteToUser: false, // N o importa favoritos neste caso
+                };
+            });
+
+            return res.status(200).json({
+                data: transformedCreatures,
+                count: transformedCreatures.length, // Retornar apenas os 10 registros
+            });
+        }
+
+        let favoriteIds = [];
+        if (OnlyFavoriteArcanes === 'true') {
+            const favorites = await UserFavourite.findAll({
+                where: { UserId: userId },
+                attributes: ['CreatureId'],
+                raw: true,
+            });
+            favoriteIds = favorites.map(fav => fav.CreatureId);
+
+            where.Id = { [Op.in]: favoriteIds }; // Apenas favoritos
+        } else if (OnlyFavoriteArcanes === 'false') {
+            const favorites = await UserFavourite.findAll({
+                where: { UserId: userId },
+                attributes: ['CreatureId'],
+                raw: true,
+            });
+            favoriteIds = favorites.map(fav => fav.CreatureId);
+
+            where.Id = { [Op.notIn]: favoriteIds }; // Apenas n o favoritos
+        }
+
+        // Consultar com pagina  o
         const { rows, count } = await Creature.findAndCountAll({
             where,
-            attributes: ['Id', 'Name', 'Img', 'Lore'], // Selecionar campos específicos
-            limit: parseInt(limit, 10), // Limite de registros por página
-            offset: (parseInt(page, 10) - 1) * parseInt(limit, 10), // Calcular offset para paginação
+            attributes: ['Id', 'Name', 'Img', 'Lore'],
+            limit: parseInt(limit, 10),
+            offset: (parseInt(page, 10) - 1) * parseInt(limit, 10),
         });
 
-        // Obter IDs das criaturas
-        const creatureIds = rows.map(creature => creature.Id);
-
-        // Verificar favoritos do usuário
-        const favorites = await UserFavourite.findAll({
-            where: {
-                UserId: userId,
-                CreatureId: { [Op.in]: creatureIds },
-            },
-            attributes: ['CreatureId'],
-        });
-
-        // Criar um conjunto com os IDs das criaturas favoritas
-        const favoriteSet = new Set(favorites.map(fav => fav.CreatureId));
-
-        // Transformar os resultados para incluir o campo "isFavoriteToUser"
         const transformedCreatures = rows.map(creature => {
             const mimeType = creature.Img ? getMimeType(creature.Img) : null;
             return {
@@ -61,18 +93,14 @@ exports.getAllCreatures = async (req, res) => {
                     ? `data:${mimeType};base64,${creature.Img.toString('base64')}` // Converter Buffer para Base64 com MIME
                     : null,
                 Lore: creature.Lore,
-                isFavoriteToUser: favoriteSet.has(creature.Id), // Verificar se é favorito
+                isFavoriteToUser: favoriteIds.includes(creature.Id), // Verificar se   favorito
             };
         });
 
-        // Enviar resposta com dados e contagem total
-        return res.status(200).json({
-            data: transformedCreatures,
-            count, // Número total de registros
-        });
+        return res.status(200).json({ data: transformedCreatures, count });
     } catch (error) {
-        console.error('Erro ao buscar criaturas:', error); // Log de erro para debug
-        return res.status(500).json({ error: 'Falha ao buscar criaturas. Por favor, tente novamente.' }); // Mensagem de erro amigável
+        console.error('Erro ao buscar criaturas:', error);
+        return res.status(500).json({ error: 'Falha ao buscar criaturas. Por favor, tente novamente.' });
     }
 };
 
@@ -135,26 +163,43 @@ exports.removeCreatureFromFavourites = async (req, res) => {
 // Update the background image for a favourite creature
 exports.changeFavouriteCreatureBackground = async (req, res) => {
     try {
-        const { BackgroundImg } = req.body; // Extract the new background image URL from the request body
-        const favourite = await UserFavourite.update(
-            { BackgroundImg }, // Update the BackgroundImg field
-            { where: { Id: req.params.id, UserId: req.userId } } // Match by ID and user ownership
+        const { BackgroundImg } = req.body;
+
+        if (!BackgroundImg) {
+            return res.status(400).json({ error: 'BackgroundImg is required' });
+        }
+
+        const updated = await UserFavourite.update(
+            { BackgroundImg },
+            { where: { CreatureId: req.params.id, UserId: req.userId } }
         );
-        res.status(200).json({ message: 'Background updated successfully' }); // Confirm successful update
+
+        if (updated[0] === 0) {
+            return res.status(404).json({ error: 'Favourite not found' });
+        }
+
+        res.status(200).json({ message: 'Background updated successfully' });
     } catch (error) {
-        res.status(500).json({ error: error.message }); // Send server error response
+        console.error(error);
+        res.status(500).json({ error: 'Failed to update background image.' });
     }
 };
 
 // Reset the background image for a favourite creature to default
 exports.changeFavouriteCreatureBackgroundToDefault = async (req, res) => {
     try {
-        const favourite = await UserFavourite.update(
-            { BackgroundImg: null }, // Set BackgroundImg to null (default)
-            { where: { Id: req.params.id, UserId: req.userId } } // Match by ID and user ownership
+        const reset = await UserFavourite.update(
+            { BackgroundImg: null },
+            { where: { CreatureId: req.params.id, UserId: req.userId } }
         );
-        res.status(200).json({ message: 'Background reset to default' }); // Confirm successful reset
+
+        if (reset[0] === 0) {
+            return res.status(404).json({ error: 'Favourite not found' });
+        }
+
+        res.status(200).json({ message: 'Background reset to default successfully.' });
     } catch (error) {
-        res.status(500).json({ error: error.message }); // Send server error response
+        console.error(error);
+        res.status(500).json({ error: 'Failed to reset background image.' });
     }
 };

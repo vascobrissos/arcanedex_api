@@ -9,8 +9,8 @@ const adminCreatureRoutes = require('./routes/adminCreatureRoutes'); // Import a
 const app = express(); // Initialize the Express application
 
 // Configurar body-parser com um limite maior
-app.use(bodyParser.json({ limit: '5mb' })); // Permite atÃ© 5 MB
-app.use(bodyParser.urlencoded({ limit: '5mb', extended: true }));
+app.use(bodyParser.json({ limit: '15mb' })); // Permite até 5 MB
+app.use(bodyParser.urlencoded({ limit: '15mb', extended: true }));
 
 // Middleware
 
