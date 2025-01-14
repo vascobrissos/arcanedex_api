@@ -4,7 +4,14 @@ const { Op } = require('sequelize'); // Import Sequelize operators for querying
 
 // Helper function to determine the MIME type of binary image data
 const getMimeType = (imgBuffer) => {
-    if (!imgBuffer || imgBuffer.length < 4) return null; // Verifica se o buffer é válido
+    if (!imgBuffer || imgBuffer.length < 12) return null; // Verifica se o buffer é válido e suficientemente longo
+    const riffHeader = imgBuffer.slice(0, 4).toString('hex'); // Verifica a assinatura RIFF
+    const webpHeader = imgBuffer.slice(8, 12).toString('ascii'); // Verifica o identificador WEBP
+
+    if (riffHeader === '52494646' && webpHeader === 'WEBP') {
+        return 'image/webp'; // WEBP
+    }
+
     const signature = imgBuffer.slice(0, 4).toString('hex');
     switch (signature) {
         case '89504e47': return 'image/png'; // PNG

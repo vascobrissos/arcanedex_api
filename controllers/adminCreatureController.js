@@ -1,6 +1,32 @@
 const Creature = require('../models/creature'); // Import the Creature model
 const { Op } = require('sequelize'); // Import Sequelize operators for querying
 
+// Helper function to determine the MIME type of binary image data
+const getMimeType = (imgBuffer) => {
+    if (!imgBuffer || imgBuffer.length < 12) return null; // Verifica se o buffer � v�lido e suficientemente longo
+    const riffHeader = imgBuffer.slice(0, 4).toString('hex'); // Verifica a assinatura RIFF
+    const webpHeader = imgBuffer.slice(8, 12).toString('ascii'); // Verifica o identificador WEBP
+
+    if (riffHeader === '52494646' && webpHeader === 'WEBP') {
+        return 'image/webp'; // WEBP
+    }
+
+    const signature = imgBuffer.slice(0, 4).toString('hex');
+    switch (signature) {
+        case '89504e47': return 'image/png'; // PNG
+        case 'ffd8ffe0': 
+        case 'ffd8ffe1': 
+        case 'ffd8ffe2': 
+        case 'ffd8ffe3': 
+        case 'ffd8ffe8': return 'image/jpeg'; // JPEG
+        case '47494638': return 'image/gif'; // GIF
+        case '49492a00': 
+        case '4d4d002a': return 'image/tiff'; // TIFF
+        default: return 'application/octet-stream'; // Tipo desconhecido
+    }
+};
+
+
 // Controller function to fetch all creatures with optional filters for name, date, pagination
 exports.getAllCreatures = async (req, res) => {
     const { name, latest, page = 1, limit = 10 } = req.query; // Extract query parameters with default values
@@ -11,17 +37,38 @@ exports.getAllCreatures = async (req, res) => {
         if (latest) where.CreatedOn = { [Op.lt]: latest }; // Filter creatures created before the 'latest' date
 
         // Query the database for creatures and count total matching results
-        const creatures = await Creature.findAndCountAll({
+        const { rows, count } = await Creature.findAndCountAll({
             where, // Apply filters
-            attributes: ['Id', 'Name', 'Img'], // Fetch only specific fields
-            limit, // Limit the number of results per page
-            offset: (page - 1) * limit, // Calculate offset for pagination
+            attributes: ['Id', 'Name', 'Img', 'Lore'], // Fetch specific fields
+            limit: parseInt(limit, 10), // Limit the number of results per page
+            offset: (parseInt(page, 10) - 1) * parseInt(limit, 10), // Calculate offset for pagination
         });
 
-        // Respond with the queried data and the total count
-        res.status(200).json({ data: creatures.rows, count: creatures.count });
+        // Transform the creatures to include Base64 encoded images
+        const transformedCreatures = rows.map(creature => {
+            const mimeType = creature.Img ? getMimeType(creature.Img) : null;
+            return {
+                Id: creature.Id,
+                Name: creature.Name,
+                Img: creature.Img
+                    ? `data:${mimeType};base64,${creature.Img.toString('base64')}`
+                    : null,
+                Lore: creature.Lore,
+            };
+        });
+
+        // Count the total number of creatures in the database (ignoring pagination)
+        const totalCreatures = await Creature.count({ where });
+
+        // Respond with the transformed data, total count, and filtered count
+        res.status(200).json({
+            data: transformedCreatures,
+            filteredCount: count, // Count of creatures after applying filters
+            totalCount: totalCreatures, // Total count of creatures in the database
+        });
     } catch (error) {
-        res.status(500).json({ error: error.message }); // Handle server errors
+        console.error('Error fetching creatures:', error);
+        res.status(500).json({ error: 'Failed to fetch creatures. Please try again.' });
     }
 };
 
@@ -81,8 +128,9 @@ exports.addCreature = async (req, res) => {
 // Controller function to update a creature's details
 exports.editCreature = async (req, res) => {
     const { Name, Lore, Img } = req.body; // Extract updated data from the request body
-
+console.log(req.params.id)
     try {
+console.log("Tipo MIME recebido:", req.body.Img.split(";")[0]);
         // Decode the Base64 image if provided
         let buffer = null;
         if (Img) {
