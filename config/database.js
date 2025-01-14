@@ -1,16 +1,16 @@
-const { Sequelize } = require('sequelize'); // Import the Sequelize library, a popular ORM for Node.js
+const { Sequelize } = require('sequelize'); // Importa a biblioteca Sequelize, um ORM popular para Node.js
 
-require('dotenv').config(); // Load environment variables from a .env file into process.env
+require('dotenv').config(); // Carrega variáveis de ambiente de um ficheiro .env para process.env
 
-// Create a Sequelize instance, connecting to a database using environment variables for credentials
+// Cria uma instância do Sequelize, ligando a uma base de dados usando variáveis de ambiente para as credenciais
 const sequelize = new Sequelize(
-    process.env.DB_NAME, // Database name
-    process.env.DB_USER, // Database username
-    process.env.DB_PASSWORD, // Database password
+    process.env.DB_NAME, // Nome da base de dados
+    process.env.DB_USER, // Nome de utilizador da base de dados
+    process.env.DB_PASSWORD, // Palavra-passe da base de dados
     {
-        host: process.env.DB_HOST, // Database host (e.g., localhost, or a remote server)
-        dialect: 'mysql', // Specify the database dialect (MySQL in this case)
+        host: process.env.DB_HOST, // Host da base de dados (ex.: localhost ou servidor remoto)
+        dialect: 'mysql', // Especifica o tipo de base de dados (MySQL neste caso)
     }
 );
 
-module.exports = sequelize; // Export the Sequelize instance for use in other parts of the application
+module.exports = sequelize; // Exporta a instância do Sequelize para ser utilizada noutras partes da aplicação

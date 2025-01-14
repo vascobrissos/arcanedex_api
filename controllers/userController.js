@@ -1,35 +1,36 @@
-const User = require('../models/user'); // Import the User model
-const jwt = require('jsonwebtoken'); // Import the JWT library for token generation and verification
-const bcrypt = require('bcrypt'); // Import bcrypt for hashing passwords
-require('dotenv').config(); // Load environment variables from a .env file into process.env
-const UserFavourite = require('../models/userFavourite'); // Ajuste o caminho se necessário
-const Creature = require('../models/creature'); // Ajuste o caminho se necessário
+const User = require('../models/user'); // Importa o modelo de utilizador
+const jwt = require('jsonwebtoken'); // Biblioteca para geraÃ§Ã£o e verificaÃ§Ã£o de tokens JWT
+const bcrypt = require('bcrypt'); // Biblioteca para hashing de passwords
+require('dotenv').config(); // Carrega variÃ¡veis de ambiente do ficheiro .env
+const UserFavourite = require('../models/userFavourite'); // Modelo para favoritos do utilizador
+const Creature = require('../models/creature'); // Modelo para criaturas
 
-
-
+// Registar um novo utilizador
 exports.registerUser = async (req, res) => {
     try {
         const { FirstName, LastName, Email, Genero, Username, Password, Role } = req.body;
 
-        // Input validation
+        // ValidaÃ§Ã£o dos campos obrigatÃ³rios
         if (!FirstName || !LastName || !Email || !Username || !Password || !Role) {
-            return res.status(400).json({ error: 'All fields are required' });
+            return res.status(400).json({ error: 'Todos os campos sÃ£o obrigatÃ³rios' });
         }
 
+        // Verificar se o email jÃ¡ existe
         const emailExists = await User.findOne({ where: { Email } });
         if (emailExists) {
-            return res.status(400).json({ error: 'Email already in use' });
+            return res.status(400).json({ error: 'Email jÃ¡ estÃ¡ em uso' });
         }
 
+        // Verificar se o nome de utilizador jÃ¡ existe
         const usernameExists = await User.findOne({ where: { Username } });
         if (usernameExists) {
-            return res.status(400).json({ error: 'Username already in use' });
+            return res.status(400).json({ error: 'Nome de utilizador jÃ¡ estÃ¡ em uso' });
         }
 
-        // Hash the password
+        // Hash da password
         const hashedPassword = await bcrypt.hash(Password, 10);
 
-        // Insert the new user
+        // Inserir o novo utilizador na base de dados
         const newUser = await User.create({
             FirstName,
             LastName,
@@ -40,127 +41,128 @@ exports.registerUser = async (req, res) => {
             Role,
         });
 
-        res.status(201).json(newUser);
+        res.status(201).json(newUser); // Resposta com o utilizador criado
+    } catch (error) {
+        res.status(500).json({ error: error.message }); // Erro do servidor
+    }
+};
+
+// Login de um utilizador existente
+exports.loginUser = async (req, res) => {
+    try {
+        const { Username, Password } = req.body; // Extrair credenciais do pedido
+        const user = await User.findOne({ where: { Username } }); // Procurar utilizador pelo nome de utilizador
+        if (!user) return res.status(404).json({ error: 'Utilizador nÃ£o encontrado' });
+
+        // Comparar a password fornecida com a armazenada (hash)
+        const validPassword = await bcrypt.compare(Password, user.Password);
+        if (!validPassword) return res.status(401).json({ error: 'Password invÃ¡lida' });
+
+        // Gerar um token JWT
+        const token = jwt.sign(
+            { id: user.Id, role: user.Role }, // Payload do token
+            process.env.JWT_SECRET, // Chave secreta
+            { expiresIn: '1h' } // Tempo de expiraÃ§Ã£o do token
+        );
+
+        res.status(200).json({ token }); // Responder com o token
+    } catch (error) {
+        res.status(500).json({ error: error.message }); // Erro do servidor
+    }
+};
+
+// Obter o perfil do utilizador autenticado
+exports.getUserProfile = async (req, res) => {
+    try {
+        const user = await User.findByPk(req.userId, {
+            attributes: { exclude: ['Password'] }, // Excluir o campo da password
+        });
+
+        if (!user) return res.status(404).json({ error: 'Utilizador nÃ£o encontrado' });
+        res.status(200).json(user); // Responder com o perfil do utilizador
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 };
 
-
-// Log in an existing user
-exports.loginUser = async (req, res) => {
-    try {
-        const { Username, Password } = req.body; // Extract login credentials from the request body
-        const user = await User.findOne({ where: { Username } }); // Find the user by username
-        if (!user) return res.status(404).json({ error: 'User not found' }); // If user not found, return 404 error
-
-        const validPassword = await bcrypt.compare(Password, user.Password); // Compare the provided password with the hashed password
-        if (!validPassword) return res.status(401).json({ error: 'Invalid password' }); // If password is invalid, return 401 error
-
-        const token = jwt.sign(
-            { id: user.Id, role: user.Role }, // Payload containing user ID and role
-            process.env.JWT_SECRET, // Secret key from environment variables
-            { expiresIn: '1h' } // Token expiration time
-        );
-        res.status(200).json({ token }); // Respond with the JWT token
-    } catch (error) {
-        res.status(500).json({ error: error.message }); // Handle server errors
-    }
-};
-
-// Get the profile of the currently logged-in user
-exports.getUserProfile = async (req, res) => {
-    try {
-        const user = await User.findByPk(req.userId, {
-            attributes: { exclude: ['Password'] }, // Exclude the password field from the result
-        });
-        if (!user) return res.status(404).json({ error: 'User not found' }); // If user not found, return 404 error
-        res.status(200).json(user); // Respond with the user profile
-    } catch (error) {
-        res.status(500).json({ error: error.message }); // Handle server errors
-    }
-};
-
-// Update user profile (except username)
+// Atualizar o perfil do utilizador (exceto o nome de utilizador)
 exports.updateUser = async (req, res) => {
     try {
-        const userId = req.userId; // Extract user ID from the JWT middleware
+        const userId = req.userId; // ID do utilizador autenticado
         const { FirstName, LastName, Email, Genero, Password } = req.body;
 
-        // Validate required fields
+        // ValidaÃ§Ã£o: pelo menos um campo deve ser atualizado
         if (!FirstName && !LastName && !Email && !Genero && !Password) {
-            return res.status(400).json({ error: 'At least one field must be updated' });
+            return res.status(400).json({ error: 'Pelo menos um campo deve ser atualizado' });
         }
 
-        const user = await User.findByPk(userId); // Find the user by primary key
+        const user = await User.findByPk(userId); // Encontrar utilizador pelo ID
         if (!user) {
-            return res.status(404).json({ error: 'User not found' });
+            return res.status(404).json({ error: 'Utilizador nÃ£o encontrado' });
         }
 
-        // If email is being updated, check for uniqueness
+        // Verificar unicidade do email (se atualizado)
         if (Email && Email !== user.Email) {
             const emailExists = await User.findOne({ where: { Email } });
             if (emailExists) {
-                return res.status(400).json({ error: 'Email already in use' });
+                return res.status(400).json({ error: 'Email jÃ¡ estÃ¡ em uso' });
             }
         }
 
-        // Update user fields
+        // Atualizar os campos
         if (FirstName) user.FirstName = FirstName;
         if (LastName) user.LastName = LastName;
         if (Email) user.Email = Email;
         if (Genero) user.Genero = Genero;
-        if (Password) user.Password = await bcrypt.hash(Password, 10); // Hash the new password
+        if (Password) user.Password = await bcrypt.hash(Password, 10); // Hash da nova password
 
-        await user.save(); // Save the changes to the database
+        await user.save(); // Salvar as alteraÃ§Ãµes
 
-        res.status(200).json({ message: 'User updated successfully', user });
+        res.status(200).json({ message: 'Perfil atualizado com sucesso', user });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 };
 
-
+// Apagar a conta do utilizador
 exports.deleteUserAccount = async (req, res) => {
     try {
-        const userId = req.userId; // O ID do usuário é obtido através do middleware de autenticação
-	console.log("teste");
-        // Verificar se o usuário existe
+        const userId = req.userId; // ID do utilizador autenticado
+
+        // Verificar se o utilizador existe
         const user = await User.findByPk(userId);
         if (!user) {
-            return res.status(404).json({ error: 'User not found' });
+            return res.status(404).json({ error: 'Utilizador nÃ£o encontrado' });
         }
 
-        // Iniciar transação para garantir consistência
+        // Iniciar uma transaÃ§Ã£o para garantir consistÃªncia
         const transaction = await User.sequelize.transaction();
 
         try {
-            // 1. Remover favoritos associados ao usuário
+            // Remover favoritos associados ao utilizador
             await UserFavourite.destroy({ where: { UserId: userId }, transaction });
 
-            // 2. Opcional: Tratar registros criados pelo usuário
-            // Aqui você pode remover ou transferir a propriedade de criaturas
+            // Opcional: Remover criaturas criadas pelo utilizador
             const userCreatures = await Creature.findAll({ where: { CreatedBy: userId } });
             if (userCreatures.length > 0) {
-                // Remover criaturas criadas pelo usuário
                 await Creature.destroy({ where: { CreatedBy: userId }, transaction });
             }
 
-            // 3. Remover o usuário
+            // Apagar o utilizador
             await User.destroy({ where: { Id: userId }, transaction });
 
-            // Commit da transação
+            // Commit da transaÃ§Ã£o
             await transaction.commit();
 
-            res.status(200).json({ message: 'User account deleted successfully' });
+            res.status(200).json({ message: 'Conta apagada com sucesso' });
         } catch (err) {
             // Rollback em caso de erro
             await transaction.rollback();
-            console.error('Error deleting user account:', err);
-            res.status(500).json({ error: 'Failed to delete user account' });
+            console.error('Erro ao apagar a conta:', err);
+            res.status(500).json({ error: 'Falha ao apagar a conta do utilizador' });
         }
     } catch (error) {
-        console.error('Error in deleteUserAccount:', error);
-        res.status(500).json({ error: 'Server error' });
+        console.error('Erro em deleteUserAccount:', error);
+        res.status(500).json({ error: 'Erro no servidor' });
     }
 };

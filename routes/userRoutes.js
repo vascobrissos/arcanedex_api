@@ -1,37 +1,41 @@
-const express = require('express'); // Import Express to create routes
-const router = express.Router(); // Create a new router instance
-const userController = require('../controllers/userController'); // Import the user controller
-const authMiddleware = require('../middleware/authMiddleware'); // Import authentication middleware
+const express = require('express'); // Importa o Express para criar rotas
+const router = express.Router(); // Cria uma nova instância de router
+const userController = require('../controllers/userController'); // Importa o controlador de utilizadores
+const authMiddleware = require('../middleware/authMiddleware'); // Importa o middleware de autenticação
 
-// Public Routes
+// Rotas Públicas
 
-// Register a new user
+// Registar um novo utilizador
 router.post('/register', userController.registerUser);
-// Allows new users to create an account by providing required details (e.g., username, password, email).
+// Permite que novos utilizadores criem uma conta fornecendo os dados necessários (e.g., nome de utilizador, palavra-passe, email).
 
-// Login an existing user
+// Iniciar sessão para um utilizador existente
 router.post('/login', userController.loginUser);
-// Allows existing users to log in with their credentials and receive a JWT token.
+// Permite que utilizadores existentes façam login com as suas credenciais e recebam um token JWT.
 
-// Protected Routes
+// Rotas Protegidas (Requerem Autenticação)
 
-// Get the profile of the currently logged-in user
+// Obter o perfil do utilizador atualmente autenticado
 router.get(
     '/profile',
-    authMiddleware.verifyToken, // Middleware to verify the JWT token
-    userController.getUserProfile // Retrieves the user's profile (excluding sensitive info like password).
+    authMiddleware.verifyToken, // Middleware para verificar o token JWT
+    userController.getUserProfile // Recupera o perfil do utilizador (excluindo informações sensíveis, como a palavra-passe).
 );
 
-// Rota para deletar a conta do usu�rio
-router.delete('/deleteAccount', authMiddleware.verifyToken, userController.deleteUserAccount);
+// Eliminar a conta do utilizador autenticado
+router.delete(
+    '/deleteAccount',
+    authMiddleware.verifyToken, // Middleware para verificar o token JWT
+    userController.deleteUserAccount // Controlador para eliminar a conta do utilizador.
+);
 
-// Update the currently logged-in user's profile (except username)
+// Atualizar o perfil do utilizador autenticado (exceto o nome de utilizador)
 router.put(
     '/profile',
-    authMiddleware.verifyToken, // Middleware to verify the JWT token
-    userController.updateUser // Calls the `updateUser` method in the user controller
+    authMiddleware.verifyToken, // Middleware para verificar o token JWT
+    userController.updateUser // Controlador para atualizar os dados do utilizador.
 );
-// Allows authenticated users to update their details (e.g., email, name, password) while keeping the username unchanged.
+// Permite que utilizadores autenticados atualizem os seus dados (e.g., email, nome, palavra-passe) enquanto mantêm o nome de utilizador inalterado.
 
-// Export the router to be used in other parts of the application
+// Exportar o router para ser utilizado noutras partes da aplicação
 module.exports = router;

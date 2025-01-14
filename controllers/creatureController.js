@@ -1,239 +1,170 @@
-const Creature = require('../models/creature'); // Import the Creature model
-const UserFavourite = require('../models/userFavourite'); // Import the UserFavourite model
-const { Op } = require('sequelize'); // Import Sequelize operators for querying
+const Creature = require('../models/creature'); // Importa o modelo Creature
+const { Op } = require('sequelize'); // Importa operadores do Sequelize para consultas
 
-// Helper function to determine the MIME type of binary image data
+// Função auxiliar para determinar o tipo MIME de dados binários de imagem
 const getMimeType = (imgBuffer) => {
-    if (!imgBuffer || imgBuffer.length < 12) return null; // Verifica se o buffer � v�lido e suficientemente longo
+    if (!imgBuffer || imgBuffer.length < 12) return null; // Verifica se o buffer é válido e suficientemente longo
     const riffHeader = imgBuffer.slice(0, 4).toString('hex'); // Verifica a assinatura RIFF
     const webpHeader = imgBuffer.slice(8, 12).toString('ascii'); // Verifica o identificador WEBP
 
     if (riffHeader === '52494646' && webpHeader === 'WEBP') {
-        return 'image/webp'; // WEBP
+        return 'image/webp'; // Retorna WEBP
     }
 
     const signature = imgBuffer.slice(0, 4).toString('hex');
     switch (signature) {
-        case '89504e47': return 'image/png'; // PNG
+        case '89504e47': return 'image/png'; // Retorna PNG
         case 'ffd8ffe0': 
         case 'ffd8ffe1': 
         case 'ffd8ffe2': 
         case 'ffd8ffe3': 
-        case 'ffd8ffe8': return 'image/jpeg'; // JPEG
-        case '47494638': return 'image/gif'; // GIF
+        case 'ffd8ffe8': return 'image/jpeg'; // Retorna JPEG
+        case '47494638': return 'image/gif'; // Retorna GIF
         case '49492a00': 
-        case '4d4d002a': return 'image/tiff'; // TIFF
-        default: return 'application/octet-stream'; // Tipo desconhecido
+        case '4d4d002a': return 'image/tiff'; // Retorna TIFF
+        default: return 'application/octet-stream'; // Retorna tipo desconhecido
     }
 };
 
-// Endpoint para buscar todas as criaturas
+// Controlador para buscar todas as criaturas com filtros opcionais
 exports.getAllCreatures = async (req, res) => {
-    const { name, latest, page = 1, limit = 10, OnlyFavoriteArcanes = false, ToSaveOffline = false } = req.query;
-    const userId = req.userId; // Assumindo que o userId vem do middleware de autentica  o
+    const { name, latest, page = 1, limit = 10 } = req.query; // Extrai parâmetros de consulta
 
     try {
-        // Construir condi  es de filtro
-        const where = {};
-        if (name && name.trim() !== "") {
-            where.Name = { [Op.like]: `%${name}%` }; // Filtro parcial por nome
-        }
-        if (latest) {
-            where.CreatedOn = { [Op.lt]: latest }; // Filtro por data de cria  o
-        }
+        const where = {}; // Define um objeto de filtro para condições de consulta
+        if (name) where.Name = { [Op.like]: `%${name}%` }; // Filtra criaturas pelo nome
+        if (latest) where.CreatedOn = { [Op.lt]: latest }; // Filtra criaturas criadas antes de uma data específica
 
-        // Verificar condi  es especiais para favoritos ou salvar offline
-        if (ToSaveOffline === 'true') {
-            // Se ToSaveOffline for true, ignorar favoritos e devolver 10 registros
-            const monsters = await Creature.findAll({
-                attributes: ['Id', 'Name', 'Img', 'Lore'],
-                limit: 10,
-            });
-
-            const transformedCreatures = monsters.map(creature => {
-                const mimeType = creature.Img ? getMimeType(creature.Img) : null;
-                return {
-                    Id: creature.Id,
-                    Name: creature.Name,
-                    Img: creature.Img
-                        ? `data:${mimeType};base64,${creature.Img.toString('base64')}` // Converter Buffer para Base64 com MIME
-                        : null,
-                    Lore: creature.Lore,
-                    isFavoriteToUser: false, // N o importa favoritos neste caso
-                };
-            });
-
-            return res.status(200).json({
-                data: transformedCreatures,
-                count: transformedCreatures.length, // Retornar apenas os 10 registros
-            });
-        }
-
-        let favoriteIds = [];
-        if (OnlyFavoriteArcanes === 'true') {
-            const favorites = await UserFavourite.findAll({
-                where: { UserId: userId },
-                attributes: ['CreatureId'],
-                raw: true,
-            });
-            favoriteIds = favorites.map(fav => fav.CreatureId);
-
-            where.Id = { [Op.in]: favoriteIds }; // Apenas favoritos
-        } else if (OnlyFavoriteArcanes === 'false') {
-            const favorites = await UserFavourite.findAll({
-                where: { UserId: userId },
-                attributes: ['CreatureId'],
-                raw: true,
-            });
-            favoriteIds = favorites.map(fav => fav.CreatureId);
-
-            where.Id = { [Op.notIn]: favoriteIds }; // Apenas n o favoritos
-        }
-
-        // Consultar com pagina  o
+        // Consulta a base de dados para obter criaturas e contar os resultados
         const { rows, count } = await Creature.findAndCountAll({
-            where,
-            attributes: ['Id', 'Name', 'Img', 'Lore'],
-            limit: parseInt(limit, 10),
-            offset: (parseInt(page, 10) - 1) * parseInt(limit, 10),
+            where, // Aplica os filtros
+            attributes: ['Id', 'Name', 'Img', 'Lore'], // Seleciona campos específicos
+            limit: parseInt(limit, 10), // Limita o número de resultados por página
+            offset: (parseInt(page, 10) - 1) * parseInt(limit, 10), // Calcula o deslocamento para paginação
         });
 
+        // Transforma as criaturas para incluir imagens codificadas em Base64
         const transformedCreatures = rows.map(creature => {
             const mimeType = creature.Img ? getMimeType(creature.Img) : null;
             return {
                 Id: creature.Id,
                 Name: creature.Name,
                 Img: creature.Img
-                    ? `data:${mimeType};base64,${creature.Img.toString('base64')}` // Converter Buffer para Base64 com MIME
+                    ? `data:${mimeType};base64,${creature.Img.toString('base64')}` // Codifica Buffer para Base64 com MIME
                     : null,
                 Lore: creature.Lore,
-                isFavoriteToUser: favoriteIds.includes(creature.Id), // Verificar se   favorito
             };
         });
 
-        return res.status(200).json({ data: transformedCreatures, count });
+        // Conta o número total de criaturas na base de dados (ignorando a paginação)
+        const totalCreatures = await Creature.count({ where });
+
+        // Responde com os dados transformados, contagem total e contagem filtrada
+        res.status(200).json({
+            data: transformedCreatures,
+            filteredCount: count, // Contagem após filtros
+            totalCount: totalCreatures, // Contagem total na base de dados
+        });
     } catch (error) {
         console.error('Erro ao buscar criaturas:', error);
-        return res.status(500).json({ error: 'Falha ao buscar criaturas. Por favor, tente novamente.' });
+        res.status(500).json({ error: 'Falha ao buscar criaturas. Por favor, tente novamente.' });
     }
 };
 
-// Fetch BackgroundImg for a creature favorited by the user
-exports.getCreatureDetails = async (req, res) => {
+// Controlador para adicionar uma nova criatura
+exports.addCreature = async (req, res) => {
+    const { Name, Lore, Img } = req.body; // Extrai os dados do corpo da requisição
+
+    const CreatedBy = req.userId; // Obtém o ID do utilizador autenticado
+
+    console.log(Img);
+
     try {
-        console.log("Fetching creature details...");
-
-        const favorite = await UserFavourite.findOne({
-            where: {
-                CreatureId: req.params.id,
-                UserId: req.userId,
-            },
-            attributes: ['BackgroundImg'], // Fetch only the BackgroundImg field
-        });
-
-        if (!favorite) {
-            return res.status(404).json({ error: 'Favourite not found for this user and creature.' });
+        // Verifica se já existe uma criatura com o mesmo nome
+        const existingCreature = await Creature.findOne({ where: { Name } });
+        if (existingCreature) {
+            return res.status(400).json({ error: 'Uma criatura com este nome já existe.' });
         }
 
-        let backgroundImgBase64 = null;
-
-        if (favorite.BackgroundImg) {
-            const mimeType = getMimeType(favorite.BackgroundImg);
-
-            if (!mimeType || mimeType === 'application/octet-stream') {
-                console.log("Buffer Signature:", favorite.BackgroundImg.slice(0, 4).toString('hex'));
-                return res.status(400).json({ error: 'Unsupported image format.' });
-            }
-
-            backgroundImgBase64 = `data:${mimeType};base64,${favorite.BackgroundImg.toString('base64')}`;
-            console.log("Detected MIME Type:", mimeType);
-        }
-
-        res.status(200).json({
-            BackgroundImg: backgroundImgBase64, // Return Base64-encoded image with MIME type
-        });
-    } catch (error) {
-        console.error('Error fetching favorite background image:', error);
-        res.status(500).json({ error: 'Failed to fetch background image. Please try again.' });
-    }
-};
-
-
-// Add a creature to the user's favourites
-exports.addCreatureToFavourites = async (req, res) => {
-    try {
-        const { CreatureId } = req.body; // Extract the CreatureId from the request body
-        const newFavourite = await UserFavourite.create({
-            CreatureId, // ID of the creature being added to favourites
-            UserId: req.userId, // User ID (assumed to be extracted from a middleware)
-            AddedBy: req.userId, // Who added this favourite (same as UserId)
-        });
-        res.status(201).json(newFavourite); // Return the newly created favourite
-    } catch (error) {
-        res.status(500).json({ error: error.message }); // Send server error response
-    }
-};
-
-// Remove a creature from the user's favourites by favourite ID
-exports.removeCreatureFromFavourites = async (req, res) => {
-    try {
-        const deleted = await UserFavourite.destroy({
-            where: { CreatureId: req.params.id, UserId: req.userId }, // Match by ID and user ownership
-        });
-        if (!deleted) return res.status(404).json({ error: 'Favourite not found' }); // If not found, return 404
-        res.status(200).json({ message: 'Favourite removed successfully' }); // Confirm successful removal
-    } catch (error) {
-        res.status(500).json({ error: error.message }); // Send server error response
-    }
-};
-
-// Update the background image for a favourite creature
-exports.changeFavouriteCreatureBackground = async (req, res) => {
-    try {
-        const { BackgroundImg } = req.body;
-
-        if (!BackgroundImg) {
-            return res.status(400).json({ error: 'BackgroundImg is required' });
-        }
-
-        // Decode the Base64 image if provided
+        // Decodifica a imagem em Base64, se fornecida
         let buffer = null;
-        if (BackgroundImg) {
-            const base64Data = BackgroundImg.split(',')[1]; // Remove the "data:image/jpeg;base64," prefix
-            buffer = Buffer.from(base64Data, 'base64'); // Convert to binary buffer
+        if (Img) {
+            const base64Data = Img.split(',')[1]; // Remove o prefixo "data:image/jpeg;base64,"
+            buffer = Buffer.from(base64Data, 'base64'); // Converte para buffer binário
         }
 
-        const updated = await UserFavourite.update(
-            { BackgroundImg: buffer }, // Save the binary data
-            { where: { CreatureId: req.params.id, UserId: req.userId } }
-        );
+        // Inicia uma transação para garantir atomicidade
+        const result = await Creature.sequelize.transaction(async (transaction) => {
+            // Salva a nova criatura na base de dados dentro da transação
+            const newCreature = await Creature.create(
+                {
+                    Name,
+                    Lore,
+                    Img: buffer, // Salva os dados binários no campo MEDIUMBLOB
+                    CreatedBy,
+                },
+                { transaction }
+            );
+            return newCreature;
+        });
 
-        if (updated[0] === 0) {
-            return res.status(404).json({ error: 'Favourite not found' });
-        }
-
-        res.status(200).json({ message: 'Background updated successfully' });
+        // Responde com a criatura criada
+        res.status(201).json(result);
     } catch (error) {
-        console.error('Error updating background image:', error);
-        res.status(500).json({ error: 'Failed to update background image.' });
+        console.error('Erro ao adicionar criatura:', error);
+
+        // Trata erros conhecidos
+        if (error.name === 'SequelizeUniqueConstraintError') {
+            res.status(400).json({ error: 'O nome da criatura deve ser único.' });
+        } else {
+            res.status(500).json({ error: 'Falha ao adicionar criatura.' });
+        }
     }
 };
 
-// Reset the background image for a favourite creature to default
-exports.changeFavouriteCreatureBackgroundToDefault = async (req, res) => {
-    try {
-        const reset = await UserFavourite.update(
-            { BackgroundImg: null },
-            { where: { CreatureId: req.params.id, UserId: req.userId } }
-        );
+// Controlador para atualizar os detalhes de uma criatura
+exports.editCreature = async (req, res) => {
+    const { Name, Lore, Img } = req.body; // Extrai os dados atualizados do corpo da requisição
+    console.log(req.params.id);
 
-        if (reset[0] === 0) {
-            return res.status(404).json({ error: 'Favourite not found' });
+    try {
+        console.log("Tipo MIME recebido:", req.body.Img.split(";")[0]);
+
+        // Decodifica a imagem em Base64, se fornecida
+        let buffer = null;
+        if (Img) {
+            const base64Data = Img.split(',')[1]; // Remove o prefixo "data:image/jpeg;base64,"
+            buffer = Buffer.from(base64Data, 'base64'); // Converte para buffer binário
         }
 
-        res.status(200).json({ message: 'Background reset to default successfully.' });
+        // Atualiza os detalhes da criatura na base de dados
+        const updated = await Creature.update(
+            { 
+                Name, 
+                Lore, 
+                Img: buffer // Salva os dados binários no campo MEDIUMBLOB
+            },
+            { where: { Id: req.params.id } } // Identifica a criatura pelo ID fornecido nos parâmetros
+        );
+
+        if (!updated[0]) {
+            return res.status(404).json({ error: 'Criatura não encontrada' }); // Retorna erro 404 se nenhuma linha for atualizada
+        }
+
+        res.status(200).json({ message: 'Criatura atualizada com sucesso' }); // Responde com mensagem de sucesso
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Failed to reset background image.' });
+        console.error('Erro ao atualizar criatura:', error);
+        res.status(500).json({ error: 'Falha ao atualizar criatura.' }); // Trata erros do servidor
+    }
+};
+
+// Controlador para eliminar uma criatura pelo ID
+exports.deleteCreature = async (req, res) => {
+    try {
+        const deleted = await Creature.destroy({ where: { Id: req.params.id } }); // Elimina o registo pelo ID
+        if (!deleted) return res.status(404).json({ error: 'Criatura não encontrada' }); // Retorna erro 404 se nenhuma linha for eliminada
+        res.status(200).json({ message: 'Criatura eliminada com sucesso' }); // Responde com mensagem de sucesso
+    } catch (error) {
+        res.status(500).json({ error: error.message }); // Trata erros do servidor
     }
 };

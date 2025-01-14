@@ -1,31 +1,31 @@
-const { DataTypes } = require('sequelize'); // Import DataTypes to define model attributes
-const sequelize = require('../config/database'); // Import the Sequelize instance configured for the database
+const { DataTypes } = require('sequelize'); // Importa o DataTypes para definir os atributos do modelo
+const sequelize = require('../config/database'); // Importa a instância do Sequelize configurada para a base de dados
 
-// Define the 'Creature' model
+// Define o modelo 'Creature'
 const Creature = sequelize.define('Creature', {
     Id: {
-        type: DataTypes.INTEGER, // Integer type for the primary key
-        primaryKey: true, // Mark as primary key
-        autoIncrement: true, // Enable auto-increment for IDs
+        type: DataTypes.INTEGER, // Tipo inteiro para a chave primária
+        primaryKey: true, // Define como chave primária
+        autoIncrement: true, // Ativa auto-incremento para os IDs
     },
-    Name: DataTypes.STRING, // String type for the name of the creature
-    Lore: DataTypes.TEXT, // Text type for the lore/description of the creature
-    CreatedBy: DataTypes.INTEGER, // Integer type to store the ID of the user who created the creature
+    Name: DataTypes.STRING, // Tipo string para o nome da criatura
+    Lore: DataTypes.TEXT, // Tipo texto para a descrição/história da criatura
+    CreatedBy: DataTypes.INTEGER, // Tipo inteiro para armazenar o ID do utilizador que criou a criatura
     CreatedOn: {
-        type: DataTypes.DATE, // Date type for creation timestamp
-        defaultValue: DataTypes.NOW, // Default value is the current date and time
+        type: DataTypes.DATE, // Tipo data para o registo de criação
+        defaultValue: DataTypes.NOW, // Valor padrão é a data e hora atuais
     },
-    UpdatedBy: DataTypes.INTEGER, // Integer type to store the ID of the user who last updated the creature
+    UpdatedBy: DataTypes.INTEGER, // Tipo inteiro para armazenar o ID do utilizador que atualizou a criatura pela última vez
     UpdatedOn: {
-        type: DataTypes.DATE, // Date type for the last updated timestamp
-        defaultValue: DataTypes.NOW, // Default value is the current date and time
+        type: DataTypes.DATE, // Tipo data para o registo da última atualização
+        defaultValue: DataTypes.NOW, // Valor padrão é a data e hora atuais
     },
     Img: {
-        type: DataTypes.BLOB('medium'), // Medium-sized binary large object for storing images
-        allowNull: true, // Allow the image field to be null
+        type: DataTypes.BLOB('medium'), // Objeto binário de tamanho médio para armazenar imagens
+        allowNull: true, // Permite que o campo de imagem seja nulo
     },
 }, {
-    timestamps: false, // Disable automatic timestamp fields (createdAt, updatedAt)
+    timestamps: false, // Desativa os campos automáticos de timestamp (createdAt, updatedAt)
 });
 
-module.exports = Creature; // Export the 'Creature' model for use in other parts of the application
+module.exports = Creature; // Exporta o modelo 'Creature' para uso noutras partes da aplicação

@@ -1,20 +1,20 @@
-const jwt = require('jsonwebtoken'); // Import the JSON Web Token library for token verification
-require('dotenv').config(); // Load environment variables from a .env file into process.env
+const jwt = require('jsonwebtoken'); // Importa a biblioteca JSON Web Token para verificação de tokens
+require('dotenv').config(); // Carrega variáveis de ambiente do ficheiro .env para process.env
 
-// Middleware to verify the JWT token in the request
+// Middleware para verificar o token JWT na requisição
 exports.verifyToken = (req, res, next) => {
-    const authHeader = req.headers['authorization']; // Retrieve the Authorization header from the request
-    if (!authHeader) return res.status(401).json({ error: 'Token missing' }); // If no Authorization header, return 401 (Unauthorized)
+    const authHeader = req.headers['authorization']; // Obtém o cabeçalho Authorization da requisição
+    if (!authHeader) return res.status(401).json({ error: 'Token ausente' }); // Se o cabeçalho Authorization estiver ausente, retorna 401 (Não autorizado)
 
-    const token = authHeader.split(' ')[1]; // Extract the token part (assuming "Bearer <token>" format)
-    if (!token) return res.status(401).json({ error: 'Token missing' }); // If token is missing, return 401 (Unauthorized)
+    const token = authHeader.split(' ')[1]; // Extrai a parte do token (assumindo o formato "Bearer <token>")
+    if (!token) return res.status(401).json({ error: 'Token ausente' }); // Se o token estiver ausente, retorna 401 (Não autorizado)
 
-    // Verify the token using the secret key
+    // Verifica o token utilizando a chave secreta
     jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
-        if (err) return res.status(401).json({ error: 'Invalid token' }); // If verification fails, return 401 (Unauthorized)
+        if (err) return res.status(401).json({ error: 'Token inválido' }); // Se a verificação falhar, retorna 401 (Não autorizado)
 
-        req.userId = decoded.id; // Attach the user ID from the token payload to the request object
-        req.userRole = decoded.role; // Attach the user role from the token payload to the request object
-        next(); // Proceed to the next middleware or route handler
+        req.userId = decoded.id; // Anexa o ID do utilizador (do payload do token) ao objeto da requisição
+        req.userRole = decoded.role; // Anexa o papel do utilizador (role) ao objeto da requisição
+        next(); // Prossegue para o próximo middleware ou handler da rota
     });
 };

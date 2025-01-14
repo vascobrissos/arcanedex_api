@@ -1,107 +1,106 @@
-const Creature = require('../models/creature'); // Import the Creature model
-const { Op } = require('sequelize'); // Import Sequelize operators for querying
+const Creature = require('../models/creature'); // Importa o modelo Creature
+const { Op } = require('sequelize'); // Importa operadores do Sequelize para consultas
 
-// Helper function to determine the MIME type of binary image data
+// Função auxiliar para determinar o tipo MIME de dados binários de imagem
 const getMimeType = (imgBuffer) => {
-    if (!imgBuffer || imgBuffer.length < 12) return null; // Verifica se o buffer � v�lido e suficientemente longo
+    if (!imgBuffer || imgBuffer.length < 12) return null; // Verifica se o buffer é válido e suficientemente longo
     const riffHeader = imgBuffer.slice(0, 4).toString('hex'); // Verifica a assinatura RIFF
     const webpHeader = imgBuffer.slice(8, 12).toString('ascii'); // Verifica o identificador WEBP
 
     if (riffHeader === '52494646' && webpHeader === 'WEBP') {
-        return 'image/webp'; // WEBP
+        return 'image/webp'; // Retorna WEBP
     }
 
     const signature = imgBuffer.slice(0, 4).toString('hex');
     switch (signature) {
-        case '89504e47': return 'image/png'; // PNG
+        case '89504e47': return 'image/png'; // Retorna PNG
         case 'ffd8ffe0': 
         case 'ffd8ffe1': 
         case 'ffd8ffe2': 
         case 'ffd8ffe3': 
-        case 'ffd8ffe8': return 'image/jpeg'; // JPEG
-        case '47494638': return 'image/gif'; // GIF
+        case 'ffd8ffe8': return 'image/jpeg'; // Retorna JPEG
+        case '47494638': return 'image/gif'; // Retorna GIF
         case '49492a00': 
-        case '4d4d002a': return 'image/tiff'; // TIFF
-        default: return 'application/octet-stream'; // Tipo desconhecido
+        case '4d4d002a': return 'image/tiff'; // Retorna TIFF
+        default: return 'application/octet-stream'; // Retorna tipo desconhecido
     }
 };
 
-
-// Controller function to fetch all creatures with optional filters for name, date, pagination
+// Controlador para buscar todas as criaturas com filtros opcionais
 exports.getAllCreatures = async (req, res) => {
-    const { name, latest, page = 1, limit = 10 } = req.query; // Extract query parameters with default values
+    const { name, latest, page = 1, limit = 10 } = req.query; // Extrai parâmetros de consulta
 
     try {
-        const where = {}; // Define a filter object for query conditions
-        if (name) where.Name = { [Op.like]: `%${name}%` }; // Filter creatures whose names contain the 'name' query
-        if (latest) where.CreatedOn = { [Op.lt]: latest }; // Filter creatures created before the 'latest' date
+        const where = {}; // Define um objeto de filtro para condições de consulta
+        if (name) where.Name = { [Op.like]: `%${name}%` }; // Filtra criaturas pelo nome
+        if (latest) where.CreatedOn = { [Op.lt]: latest }; // Filtra criaturas criadas antes de uma data específica
 
-        // Query the database for creatures and count total matching results
+        // Consulta a base de dados para obter criaturas e contar os resultados
         const { rows, count } = await Creature.findAndCountAll({
-            where, // Apply filters
-            attributes: ['Id', 'Name', 'Img', 'Lore'], // Fetch specific fields
-            limit: parseInt(limit, 10), // Limit the number of results per page
-            offset: (parseInt(page, 10) - 1) * parseInt(limit, 10), // Calculate offset for pagination
+            where, // Aplica os filtros
+            attributes: ['Id', 'Name', 'Img', 'Lore'], // Seleciona campos específicos
+            limit: parseInt(limit, 10), // Limita o número de resultados por página
+            offset: (parseInt(page, 10) - 1) * parseInt(limit, 10), // Calcula o deslocamento para paginação
         });
 
-        // Transform the creatures to include Base64 encoded images
+        // Transforma as criaturas para incluir imagens codificadas em Base64
         const transformedCreatures = rows.map(creature => {
             const mimeType = creature.Img ? getMimeType(creature.Img) : null;
             return {
                 Id: creature.Id,
                 Name: creature.Name,
                 Img: creature.Img
-                    ? `data:${mimeType};base64,${creature.Img.toString('base64')}`
+                    ? `data:${mimeType};base64,${creature.Img.toString('base64')}` // Codifica Buffer para Base64 com MIME
                     : null,
                 Lore: creature.Lore,
             };
         });
 
-        // Count the total number of creatures in the database (ignoring pagination)
+        // Conta o número total de criaturas na base de dados (ignorando a paginação)
         const totalCreatures = await Creature.count({ where });
 
-        // Respond with the transformed data, total count, and filtered count
+        // Responde com os dados transformados, contagem total e contagem filtrada
         res.status(200).json({
             data: transformedCreatures,
-            filteredCount: count, // Count of creatures after applying filters
-            totalCount: totalCreatures, // Total count of creatures in the database
+            filteredCount: count, // Contagem após filtros
+            totalCount: totalCreatures, // Contagem total na base de dados
         });
     } catch (error) {
-        console.error('Error fetching creatures:', error);
-        res.status(500).json({ error: 'Failed to fetch creatures. Please try again.' });
+        console.error('Erro ao buscar criaturas:', error);
+        res.status(500).json({ error: 'Falha ao buscar criaturas. Por favor, tente novamente.' });
     }
 };
 
-// Controller function to add a new creature
+// Controlador para adicionar uma nova criatura
 exports.addCreature = async (req, res) => {
-    const { Name, Lore, Img } = req.body; // Extract data from the request body
+    const { Name, Lore, Img } = req.body; // Extrai os dados do corpo da requisição
 
-    const CreatedBy = req.userId;
+    const CreatedBy = req.userId; // Obtém o ID do utilizador autenticado
 
-	console.log(Img)
+    console.log(Img);
 
     try {
-        // Check if a creature with the same name already exists
+        // Verifica se já existe uma criatura com o mesmo nome
         const existingCreature = await Creature.findOne({ where: { Name } });
         if (existingCreature) {
-            return res.status(400).json({ error: 'A creature with this name already exists.' });
+            return res.status(400).json({ error: 'Uma criatura com este nome já existe.' });
         }
 
-        // Decode the Base64 image if provided
+        // Decodifica a imagem em Base64, se fornecida
         let buffer = null;
         if (Img) {
-            const base64Data = Img.split(',')[1]; // Remove the "data:image/jpeg;base64," prefix
-            buffer = Buffer.from(base64Data, 'base64'); // Convert to binary buffer
+            const base64Data = Img.split(',')[1]; // Remove o prefixo "data:image/jpeg;base64,"
+            buffer = Buffer.from(base64Data, 'base64'); // Converte para buffer binário
         }
 
-        // Start a transaction to ensure atomicity
+        // Inicia uma transação para garantir atomicidade
         const result = await Creature.sequelize.transaction(async (transaction) => {
-            // Save the creature to the database within the transaction
+            // Salva a nova criatura na base de dados dentro da transação
             const newCreature = await Creature.create(
                 {
                     Name,
                     Lore,
-                    Img: buffer, // Save the binary data in the MEDIUMBLOB column
+                    Img: buffer, // Guarda os dados binários no campo MEDIUMBLOB
                     CreatedBy,
                 },
                 { transaction }
@@ -109,63 +108,63 @@ exports.addCreature = async (req, res) => {
             return newCreature;
         });
 
-        // Respond with the newly created creature
+        // Responde com a criatura criada
         res.status(201).json(result);
     } catch (error) {
-        console.error('Error adding creature:', error);
+        console.error('Erro ao adicionar criatura:', error);
 
-        // Handle known errors
+        // Trata erros conhecidos
         if (error.name === 'SequelizeUniqueConstraintError') {
-            res.status(400).json({ error: 'Creature name must be unique.' });
+            res.status(400).json({ error: 'O nome da criatura deve ser único.' });
         } else {
-            res.status(500).json({ error: 'Failed to add creature.' });
+            res.status(500).json({ error: 'Falha ao adicionar criatura.' });
         }
     }
 };
 
-
-
-// Controller function to update a creature's details
+// Controlador para atualizar os detalhes de uma criatura
 exports.editCreature = async (req, res) => {
-    const { Name, Lore, Img } = req.body; // Extract updated data from the request body
-console.log(req.params.id)
+    const { Name, Lore, Img } = req.body; // Extrai os dados atualizados do corpo da requisição
+    console.log(req.params.id);
+
     try {
-console.log("Tipo MIME recebido:", req.body.Img.split(";")[0]);
-        // Decode the Base64 image if provided
+        console.log("Tipo MIME recebido:", req.body.Img.split(";")[0]);
+
+        // Decodifica a imagem em Base64, se fornecida
         let buffer = null;
         if (Img) {
-            const base64Data = Img.split(',')[1]; // Remove the "data:image/jpeg;base64," prefix
-            buffer = Buffer.from(base64Data, 'base64'); // Convert to binary buffer
+            const base64Data = Img.split(',')[1]; // Remove o prefixo "data:image/jpeg;base64,"
+            buffer = Buffer.from(base64Data, 'base64'); // Converte para buffer binário
         }
 
-        // Update the creature's details in the database
+        // Atualiza os detalhes da criatura na base de dados
         const updated = await Creature.update(
             { 
                 Name, 
                 Lore, 
-                Img: buffer // Save the binary data in the MEDIUMBLOB column
+                Img: buffer // Salva os dados binários no campo MEDIUMBLOB
             },
-            { where: { Id: req.params.id } } // Match the creature by ID from the request params
+            { where: { Id: req.params.id } } // Identifica a criatura pelo ID fornecido nos parâmetros
         );
 
         if (!updated[0]) {
-            return res.status(404).json({ error: 'Creature not found' }); // If no rows are updated, return a 404 error
+            return res.status(404).json({ error: 'Criatura não encontrada' }); // Retorna erro 404 se nenhuma linha for atualizada
         }
 
-        res.status(200).json({ message: 'Creature updated successfully' }); // Respond with success message
+        res.status(200).json({ message: 'Criatura atualizada com sucesso' }); // Responde com mensagem de sucesso
     } catch (error) {
-        console.error('Error updating creature:', error);
-        res.status(500).json({ error: 'Failed to update creature.' }); // Handle server errors
+        console.error('Erro ao atualizar criatura:', error);
+        res.status(500).json({ error: 'Falha ao atualizar criatura.' }); // Trata erros do servidor
     }
 };
 
-// Controller function to delete a creature by ID
+// Controlador para eliminar uma criatura pelo ID
 exports.deleteCreature = async (req, res) => {
     try {
-        const deleted = await Creature.destroy({ where: { Id: req.params.id } }); // Delete the record by ID
-        if (!deleted) return res.status(404).json({ error: 'Creature not found' }); // If no rows are deleted, return a 404 error
-        res.status(200).json({ message: 'Creature deleted successfully' }); // Respond with success message
+        const deleted = await Creature.destroy({ where: { Id: req.params.id } }); // Elimina o registo pelo ID
+        if (!deleted) return res.status(404).json({ error: 'Criatura não encontrada' }); // Retorna erro 404 se nenhuma linha for eliminada
+        res.status(200).json({ message: 'Criatura eliminada com sucesso' }); // Responde com mensagem de sucesso
     } catch (error) {
-        res.status(500).json({ error: error.message }); // Handle server errors
+        res.status(500).json({ error: error.message }); // Trata erros do servidor
     }
 };

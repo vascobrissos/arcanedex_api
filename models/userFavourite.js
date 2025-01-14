@@ -1,31 +1,31 @@
-const { DataTypes } = require('sequelize'); // Import DataTypes to define model attributes
-const sequelize = require('../config/database'); // Import the Sequelize instance configured for the database
+const { DataTypes } = require('sequelize'); // Importa o DataTypes para definir os atributos do modelo
+const sequelize = require('../config/database'); // Importa a instância do Sequelize configurada para a base de dados
 
-// Define the 'UserFavourite' model
+// Define o modelo 'UserFavourite'
 const UserFavourite = sequelize.define('UserFavourite', {
     Id: {
-        type: DataTypes.INTEGER, // Integer type for the primary key
-        primaryKey: true, // Mark as primary key
-        autoIncrement: true, // Enable auto-increment for IDs
+        type: DataTypes.INTEGER, // Tipo inteiro para a chave primária
+        primaryKey: true, // Define como chave primária
+        autoIncrement: true, // Ativa o auto-incremento para os IDs
     },
-    CreatureId: DataTypes.INTEGER, // Foreign key to reference the creature being favorited
-    UserId: DataTypes.INTEGER, // Foreign key to reference the user who added the favorite
+    CreatureId: DataTypes.INTEGER, // Chave estrangeira para referenciar a criatura marcada como favorita
+    UserId: DataTypes.INTEGER, // Chave estrangeira para referenciar o utilizador que adicionou o favorito
     BackgroundImg: {
-        type: DataTypes.BLOB('medium'), // Medium-sized binary large object for storing a custom background image
-        allowNull: true, // Allow the background image field to be null
+        type: DataTypes.BLOB('medium'), // Objeto binário de tamanho médio para armazenar uma imagem de fundo personalizada
+        allowNull: true, // Permite que o campo da imagem de fundo seja nulo
     },
     AddedOn: {
-        type: DataTypes.DATE, // Date type to store when the favorite was added
-        defaultValue: DataTypes.NOW, // Default value is the current date and time
+        type: DataTypes.DATE, // Tipo data para armazenar quando o favorito foi adicionado
+        defaultValue: DataTypes.NOW, // Valor por defeito é a data e hora atual
     },
-    AddedBy: DataTypes.INTEGER, // ID of the user who added the favorite
+    AddedBy: DataTypes.INTEGER, // ID do utilizador que adicionou o favorito
     UpdatedOn: {
-        type: DataTypes.DATE, // Date type to store when the favorite was last updated
-        defaultValue: DataTypes.NOW, // Default value is the current date and time
+        type: DataTypes.DATE, // Tipo data para armazenar quando o favorito foi atualizado pela última vez
+        defaultValue: DataTypes.NOW, // Valor por defeito é a data e hora atual
     },
-    UpdatedBy: DataTypes.INTEGER, // ID of the user who last updated the favorite
+    UpdatedBy: DataTypes.INTEGER, // ID do utilizador que atualizou o favorito pela última vez
 }, {
-    timestamps: false, // Disable automatic timestamp fields (createdAt, updatedAt)
+    timestamps: false, // Desativa os campos automáticos de timestamp (createdAt, updatedAt)
 });
 
-module.exports = UserFavourite; // Export the 'UserFavourite' model for use in other parts of the application
+module.exports = UserFavourite; // Exporta o modelo 'UserFavourite' para uso noutras partes da aplicação

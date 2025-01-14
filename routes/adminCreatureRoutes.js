@@ -1,48 +1,48 @@
-const express = require('express'); // Import Express to create routes
-const router = express.Router(); // Create a new router instance
-const adminCreatureController = require('../controllers/adminCreatureController'); // Import the admin creature controller
-const authMiddleware = require('../middleware/authMiddleware'); // Import authentication middleware
+const express = require('express'); // Importa o Express para criar rotas
+const router = express.Router(); // Cria uma nova instância do router
+const adminCreatureController = require('../controllers/adminCreatureController'); // Importa o controlador para gerir criaturas como administrador
+const authMiddleware = require('../middleware/authMiddleware'); // Importa o middleware de autenticação
 
-// Middleware to check if the user has the 'Admin' role
+// Middleware para verificar se o utilizador tem o papel de 'Admin'
 const roleMiddleware = (req, res, next) => {
-    if (req.userRole !== 'Admin') { // Check if the user's role is not 'Admin'
-        return res.status(403).json({ error: 'Access forbidden: Admins only' }); // Return 403 Forbidden if not an admin
+    if (req.userRole !== 'Admin') { // Verifica se o papel do utilizador não é 'Admin'
+        return res.status(403).json({ error: 'Acesso proibido: Apenas para administradores' }); // Retorna 403 Proibido se não for admin
     }
-    next(); // If the user is an admin, proceed to the next middleware or route handler
+    next(); // Se o utilizador for admin, prossegue para o próximo middleware ou handler
 };
 
-// Protected Admin Routes
+// Rotas protegidas para administradores
 
-// Get all creatures (admin only)
+// Obter todas as criaturas (apenas para administradores)
 router.get(
     '/',
-    authMiddleware.verifyToken, // Verify the user's token
-    roleMiddleware, // Check if the user is an admin
-    adminCreatureController.getAllCreatures // Controller to fetch all creatures
+    authMiddleware.verifyToken, // Verifica o token do utilizador
+    roleMiddleware, // Verifica se o utilizador é um administrador
+    adminCreatureController.getAllCreatures // Controlador para buscar todas as criaturas
 );
 
-// Add a new creature (admin only)
+// Adicionar uma nova criatura (apenas para administradores)
 router.post(
     '/',
-    authMiddleware.verifyToken, // Verify the user's token
-    roleMiddleware, // Check if the user is an admin
-    adminCreatureController.addCreature // Controller to add a new creature
+    authMiddleware.verifyToken, // Verifica o token do utilizador
+    roleMiddleware, // Verifica se o utilizador é um administrador
+    adminCreatureController.addCreature // Controlador para adicionar uma nova criatura
 );
 
-// Edit an existing creature by ID (admin only)
+// Editar uma criatura existente pelo ID (apenas para administradores)
 router.put(
     '/:id',
-    authMiddleware.verifyToken, // Verify the user's token
-    roleMiddleware, // Check if the user is an admin
-    adminCreatureController.editCreature // Controller to edit an existing creature
+    authMiddleware.verifyToken, // Verifica o token do utilizador
+    roleMiddleware, // Verifica se o utilizador é um administrador
+    adminCreatureController.editCreature // Controlador para editar uma criatura existente
 );
 
-// Delete a creature by ID (admin only)
+// Apagar uma criatura pelo ID (apenas para administradores)
 router.delete(
     '/:id',
-    authMiddleware.verifyToken, // Verify the user's token
-    roleMiddleware, // Check if the user is an admin
-    adminCreatureController.deleteCreature // Controller to delete a creature
+    authMiddleware.verifyToken, // Verifica o token do utilizador
+    roleMiddleware, // Verifica se o utilizador é um administrador
+    adminCreatureController.deleteCreature // Controlador para apagar uma criatura
 );
 
-module.exports = router; // Export the router to use in other parts of the application
+module.exports = router; // Exporta o router para ser usado noutras partes da aplicação

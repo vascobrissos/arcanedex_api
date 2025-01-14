@@ -1,39 +1,39 @@
-const express = require('express'); // Import Express to create the server
-const bodyParser = require('body-parser'); // Import body-parser to parse incoming request bodies
-const cors = require('cors'); // Import CORS to handle cross-origin resource sharing
+const express = require('express'); // Importa o Express para criar o servidor
+const bodyParser = require('body-parser'); // Importa o body-parser para processar os corpos das requisições
+const cors = require('cors'); // Importa o CORS para lidar com partilha de recursos entre origens diferentes
 
-const userRoutes = require('./routes/userRoutes'); // Import user-related routes
-const creatureRoutes = require('./routes/creatureRoutes'); // Import creature-related routes
-const adminCreatureRoutes = require('./routes/adminCreatureRoutes'); // Import admin creature-related routes
+const userRoutes = require('./routes/userRoutes'); // Importa as rotas relacionadas com os utilizadores
+const creatureRoutes = require('./routes/creatureRoutes'); // Importa as rotas relacionadas com criaturas
+const adminCreatureRoutes = require('./routes/adminCreatureRoutes'); // Importa as rotas de administração de criaturas
 
-const app = express(); // Initialize the Express application
+const app = express(); // Inicializa a aplicação Express
 
-// Configurar body-parser com um limite maior
-app.use(bodyParser.json({ limit: '15mb' })); // Permite at� 5 MB
-app.use(bodyParser.urlencoded({ limit: '15mb', extended: true }));
+// Configurar body-parser para suportar tamanhos maiores de dados
+app.use(bodyParser.json({ limit: '15mb' })); // Permite até 15 MB para o corpo das requisições em JSON
+app.use(bodyParser.urlencoded({ limit: '15mb', extended: true })); // Permite até 15 MB para dados URL-encoded
 
 // Middleware
 
-// Parse incoming JSON request bodies
+// Processa corpos de requisições JSON
 app.use(bodyParser.json());
 
-// Enable CORS for cross-origin requests
+// Ativa o CORS para permitir requisições de origens diferentes
 app.use(cors());
 
-// Routes
+// Rotas
 
-// User-related routes (e.g., register, login, user profile)
+// Rotas relacionadas com utilizadores (e.g., registo, login, perfil de utilizador)
 app.use('/users', userRoutes);
 
-// Public and user creature-related routes (e.g., view creatures, manage favourites)
+// Rotas públicas e relacionadas com criaturas do utilizador (e.g., visualizar criaturas, gerir favoritos)
 app.use('/creatures', creatureRoutes);
 
-// Admin-specific creature routes (e.g., manage creatures as an admin)
+// Rotas específicas para administração de criaturas (e.g., gerir criaturas como administrador)
 app.use('/admin/creatures', adminCreatureRoutes);
 
-// Start the server
+// Iniciar o servidor
 
-const PORT = process.env.PORT || 3000; // Use the PORT environment variable or default to 3000
+const PORT = process.env.PORT || 3000; // Usa a variável de ambiente PORT ou, por defeito, o porto 3000
 app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`); // Log that the server is running and on which port
+    console.log(`Servidor em execução no porto ${PORT}`); // Loga que o servidor está em execução e em que porto
 });
